@@ -2,12 +2,12 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = "ap-south-1"
-        ECR_REPO = "my-app"
+        AWS_REGION = "us-east-1"
+        ECR_REPO = "user-service"
         ECS_CLUSTER = "my-ecs-cluster"
         ECS_SERVICE = "my-ecs-service"
         IMAGE_TAG = "${BUILD_NUMBER}"
-        AWS_ACCOUNT_ID = "123456789012"
+        AWS_ACCOUNT_ID = "515966537510"
         ECR_URI = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
     }
 
