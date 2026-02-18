@@ -21,7 +21,7 @@ app.use(cors({
  
 // Connect to DB
 
-db.connect();
+
  
 // Routes
 
