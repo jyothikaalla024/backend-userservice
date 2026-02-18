@@ -45,7 +45,7 @@ app.post("/register", (req, res) => {
   if (!name || !email || !password) {
     return res.status(400).json({ error: "Name, email, and password are required" });
   }
-
+console.log("DB object:", db);
   const query = "INSERT INTO users (name, email, password) VALUES (?, ?, ?)";
   db.pool.query(query, [name, email, password], (err, results) => {
     if (err) {
