@@ -32,7 +32,7 @@ app.use(limiter);
 // ======================
 // Connect to Database
 // ======================
-db.connect();
+
 
 // ======================
 // REGISTER USER
