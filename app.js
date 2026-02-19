@@ -1,4 +1,4 @@
-cat > app.js << 'EOF'
+
 const express = require("express");
 const cors = require("cors");
 const db = require("./db");
@@ -135,4 +135,4 @@ app.listen(PORT, () => {
   console.log(`   POST http://localhost:${PORT}/login`);
   console.log(`   GET  http://localhost:${PORT}/orders`);
 });
-EOF
+
