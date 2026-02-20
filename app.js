@@ -1,138 +1,158 @@
-
 const express = require("express");
 const cors = require("cors");
-const db = require("./db");
+const db = require("./db_mysql"); // MySQL connection pool
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Connect to database (mock)
-db.connect();
-
-// Middleware
+// ========== MIDDLEWARE ==========
+// Enable CORS with explicit origins (add more as needed)
 app.use(cors({
-  origin: ['http://127.0.0.1:5500', 'http://localhost:5500'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+    origin: [
+        'http://127.0.0.1:5500',
+        'http://localhost:5500',
+        'http://127.0.0.1:8080',
+        'http://localhost:8080'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+// Explicitly handle preflight requests for all routes
+app.options('*', cors());
 
-// In-memory data store
-let users = [
-  { id: 1, name: "Sai", email: "sai@example.com", password: "password1234" },
-  { id: 2, name: "DevOps User", email: "devops@example.com", password: "password123" }
-];
+app.use(express.json()); // Parse JSON bodies
 
-let orders = [
-  { id: 1, userId: 1, product: "Laptop", price: 999 },
-  { id: 2, userId: 2, product: "Mouse", price: 29 }
-];
-
-// Routes
-app.get("/", (req, res) => {
-  res.json({
-    message: "User Service API",
-    database: "Connected",
-    users: users.length,
-    endpoints: {
-      "GET /health": "Health check",
-      "GET /users": "Get all users",
-      "POST /register": "Register new user",
-      "POST /login": "Login user",
-      "GET /orders": "Get all orders"
+// ========== DATABASE CONNECTION TEST ==========
+(async () => {
+    try {
+        const [rows] = await db.query('SELECT 1');
+        console.log('✅ MySQL Database connected');
+    } catch (err) {
+        console.error('❌ MySQL connection failed:', err.message);
     }
-  });
+})();
+
+// ========== ROUTES ==========
+
+// Root endpoint – API info
+app.get("/", (req, res) => {
+    res.json({
+        message: "User Service API",
+        database: "MySQL (RDS)",
+        endpoints: {
+            "GET /health": "Health check",
+            "GET /users": "Get all users",
+            "POST /register": "Register new user",
+            "POST /login": "Login user",
+            "GET /orders": "Get all orders"
+        }
+    });
 });
 
-app.get("/health", (req, res) => {
-  res.json({ 
-    status: "healthy", 
-    database: "connected",
-    users: users.length 
-  });
+// Health check
+app.get("/health", async (req, res) => {
+    try {
+        await db.query('SELECT 1');
+        res.json({ status: "healthy", database: "connected" });
+    } catch (err) {
+        res.status(500).json({ status: "unhealthy", database: "disconnected" });
+    }
 });
 
-app.get("/users", (req, res) => {
-  // Don't send passwords
-  const safeUsers = users.map(({ password, ...user }) => user);
-  res.json(safeUsers);
+// Get all users (without passwords)
+app.get("/users", async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT id, name, email FROM users');
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Database error" });
+    }
 });
 
-app.post("/register", (req, res) => {
-  console.log("📝 Register request:", req.body);
-  
-  const { name, email, password } = req.body;
-  
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: "All fields required" });
-  }
-  
-  // Check if user exists
-  if (users.find(u => u.email === email)) {
-    return res.status(400).json({ error: "User already exists" });
-  }
-  
-  // Create new user
-  const newUser = {
-    id: users.length + 1,
-    name,
-    email,
-    password
-  };
-  
-  users.push(newUser);
-  
-  // Return without password
-  const { password: _, ...userWithoutPassword } = newUser;
-  res.status(201).json({
-    message: "User registered successfully",
-    user: userWithoutPassword
-  });
+// Register new user
+app.post("/register", async (req, res) => {
+    console.log("📝 Register request:", req.body);
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+        return res.status(400).json({ error: "All fields required" });
+    }
+
+    try {
+        // Check if user already exists
+        const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
+        if (existing.length > 0) {
+            return res.status(400).json({ error: "User already exists" });
+        }
+
+        // Insert new user
+        const [result] = await db.query(
+            'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
+            [name, email, password]
+        );
+
+        res.status(201).json({
+            message: "User registered successfully",
+            user: { id: result.insertId, name, email }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Database error" });
+    }
 });
 
-app.post("/login", (req, res) => {
-  console.log("🔐 Login request:", req.body);
-  
-  const { email, password } = req.body;
-  
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password required" });
-  }
-  
-  // Find user
-  const user = users.find(u => u.email === email && u.password === password);
-  
-  if (!user) {
-    return res.status(401).json({ error: "Invalid credentials" });
-  }
-  
-  // Generate token
-  const token = "mock-jwt-token-" + Date.now();
-  
-  // Return without password
-  const { password: _, ...userWithoutPassword } = user;
-  res.json({
-    message: "Login successful",
-    token,
-    user: userWithoutPassword
-  });
+// Login user
+app.post("/login", async (req, res) => {
+    console.log("🔐 Login request:", req.body);
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ error: "Email and password required" });
+    }
+
+    try {
+        const [users] = await db.query(
+            'SELECT id, name, email FROM users WHERE email = ? AND password = ?',
+            [email, password]
+        );
+
+        if (users.length === 0) {
+            return res.status(401).json({ error: "Invalid credentials" });
+        }
+
+        const user = users[0];
+        const token = "mock-jwt-token-" + Date.now();
+
+        res.json({
+            message: "Login successful",
+            token,
+            user
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Database error" });
+    }
 });
 
-app.get("/orders", (req, res) => {
-  console.log("📦 Orders request received");
-  res.json(orders);
+// Get orders (from orders table if exists, else mock)
+app.get("/orders", async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT * FROM orders');
+        res.json(rows);
+    } catch (err) {
+        // If table doesn't exist, return mock data
+        console.log("Orders table not found, returning mock data");
+        res.json([
+            { id: 1, userId: 1, product: "Laptop", price: 999 },
+            { id: 2, userId: 2, product: "Mouse", price: 29 }
+        ]);
+    }
 });
 
+// ========== START SERVER ==========
 app.listen(PORT, () => {
-  console.log(`✅ User Service running on port ${PORT}`);
-  console.log(`📚 Database: Mock DB connected`);
-  console.log(`🌐 CORS enabled for frontend`);
-  console.log(`📝 Available endpoints:`);
-  console.log(`   GET  http://localhost:${PORT}/`);
-  console.log(`   GET  http://localhost:${PORT}/health`);
-  console.log(`   GET  http://localhost:${PORT}/users`);
-  console.log(`   POST http://localhost:${PORT}/register`);
-  console.log(`   POST http://localhost:${PORT}/login`);
-  console.log(`   GET  http://localhost:${PORT}/orders`);
+    console.log(`✅ User Service running on port ${PORT}`);
+    console.log(`📚 Using MySQL database: database-1`);
+    console.log(`🌐 CORS enabled for: 5500, 8080`);
 });
-
