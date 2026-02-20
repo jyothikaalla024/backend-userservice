@@ -1,3 +1,4 @@
+const API_BASE_URL = "http://100.50.14.89:4000";
 const express = require("express");
 const cors = require("cors");
 const db = require("./db_mysql"); // MySQL connection pool
