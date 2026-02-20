@@ -6,20 +6,20 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // ========== MIDDLEWARE ==========
-// Enable CORS with explicit origins (add more as needed)
+// Enable CORS with your frontend origins (including live domain)
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:5500',
-    'http://localhost:5500',
-    'http://127.0.0.1:8080',
-    'http://localhost:8080'
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+    origin: [
+        'https://amznpro.online',               // your live frontend
+        'http://localhost:3000',                 // local React dev (if any)
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5500',                 // Live Server
+        'http://localhost:5500',
+        'http://127.0.0.1:8080',                 // http-server
+        'http://localhost:8080'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
 // Explicitly handle preflight requests for all routes
 app.options('*', cors());
 
@@ -157,5 +157,13 @@ app.get("/orders", async (req, res) => {
 app.listen(PORT, () => {
     console.log(`✅ User Service running on port ${PORT}`);
     console.log(`📚 Using MySQL database: database-1`);
-    console.log(`🌐 CORS enabled for: 5500, 8080`);
+    console.log(`🌐 CORS enabled for: ${JSON.stringify([
+        'https://amznpro.online',
+        'localhost:3000',
+        '127.0.0.1:3000',
+        '127.0.0.1:5500',
+        'localhost:5500',
+        '127.0.0.1:8080',
+        'localhost:8080'
+    ])}`);
 });
